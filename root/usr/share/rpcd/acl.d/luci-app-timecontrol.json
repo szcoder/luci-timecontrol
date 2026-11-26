@@ -3,13 +3,15 @@
         "description": "Grant access to Time Control",
         "read": {
             "ubus": {
-                "luci.timecontrol": [ "get_devices" ]
+                "luci.timecontrol": [ "get_devices" ],
+                "uci": [ "changes", "get" ]
             },
             "uci": [ "timecontrol" ]
         },
         "write": {
             "ubus": {
-                "luci.timecontrol": [ "reload" ]
+                "luci.timecontrol": [ "reload" ],
+                "uci": [ "add", "apply", "confirm", "delete", "order", "rename", "set" ]
             },
             "uci": [ "timecontrol" ]
         }
