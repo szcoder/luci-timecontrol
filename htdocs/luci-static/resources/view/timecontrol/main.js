@@ -109,6 +109,7 @@ return view.extend({
 			'.timecontrol-btn:hover { background: #0056b3; }',
 			'.timecontrol-add { background: #4CAF50; border-color: #4CAF50; padding: 8px 16px; }',
 			'.timecontrol-delete { background: #f44336; border-color: #f44336; padding: 5px 10px; }',
+			'.timecontrol-edit { background: #2196F3; border-color: #2196F3; padding: 5px 10px; }',
 			'.timecontrol-disable { background: #ff9800; border-color: #ff9800; padding: 5px 10px; }',
 			'.timecontrol-enable { background: #4CAF50; border-color: #4CAF50; padding: 5px 10px; }',
 			'.weekday-container { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; justify-content: center; }',
@@ -253,6 +254,68 @@ return view.extend({
 
 		var tbody = E('tbody');
 
+		function buildEditRow(slot, device) {
+			var weekdaysInput = E('input', {
+				type: 'text',
+				value: String(slot.weekdays || ''),
+				title: '例如: Mon Tue Wed Thu Fri',
+				style: 'width:150px'
+			});
+			var startInput = E('input', { type: 'time', value: slot.start_time || '' });
+			var stopInput = E('input', { type: 'time', value: slot.stop_time || '' });
+			var typeSelect = E('select', {}, [
+				E('option', { value: 'allow' }, '允许'),
+				E('option', { value: 'deny' }, '禁止')
+			]);
+			typeSelect.value = slot.rule_type || 'allow';
+
+			var enableSelect = E('select', {}, [
+				E('option', { value: '1' }, '启用'),
+				E('option', { value: '0' }, '禁用')
+			]);
+			enableSelect.value = String(slot.enable || '1') === '0' ? '0' : '1';
+
+			var saveButton = E('button', {
+				type: 'button',
+				'class': 'timecontrol-btn timecontrol-add'
+			}, '保存');
+			var cancelButton = E('button', {
+				type: 'button',
+				'class': 'timecontrol-btn'
+			}, '取消');
+
+			saveButton.addEventListener('click', function() {
+				var days = weekdaysInput.value.trim();
+				if (!days || !startInput.value || !stopInput.value) {
+					alert('请填写星期、开始时间和结束时间');
+					return;
+				}
+
+				uci.set('timecontrol', slot['.name'], 'weekdays', days);
+				uci.set('timecontrol', slot['.name'], 'start_time', startInput.value);
+				uci.set('timecontrol', slot['.name'], 'stop_time', stopInput.value);
+				uci.set('timecontrol', slot['.name'], 'rule_type', typeSelect.value);
+				uci.set('timecontrol', slot['.name'], 'enable', enableSelect.value);
+
+				commitChanges().then(function() {
+					location.reload();
+				}).catch(reportError);
+			});
+
+			cancelButton.addEventListener('click', function() {
+				location.reload();
+			});
+
+			return E('tr', {}, [
+				E('td', {}, String(device.name || '未知设备')),
+				E('td', {}, String(device.mac || '')),
+				E('td', {}, weekdaysInput),
+				E('td', {}, [ startInput, ' - ', stopInput ]),
+				E('td', {}, [ typeSelect, enableSelect ]),
+				E('td', {}, [ saveButton, cancelButton ])
+			]);
+		}
+
 		slots.forEach(function(slot) {
 			var device = devicesByName[slot.device];
 
@@ -277,6 +340,16 @@ return view.extend({
 				commitChanges().then(function() {
 					location.reload();
 				}).catch(reportError);
+			});
+
+			var editButton = E('button', {
+				type: 'button',
+				'class': 'timecontrol-btn timecontrol-edit'
+			}, '编辑');
+
+			editButton.addEventListener('click', function() {
+				var row = editButton.parentNode.parentNode;
+				row.parentNode.replaceChild(buildEditRow(slot, device), row);
 			});
 
 			var deleteButton = E('button', {
@@ -310,7 +383,7 @@ return view.extend({
 				E('td', {}, weekdays),
 				E('td', {}, (slot.start_time || '') + ' - ' + (slot.stop_time || '')),
 				E('td', {}, ruleEnabled ? '启用' : '禁用'),
-				E('td', {}, [ toggleButton, deleteButton ])
+				E('td', {}, [ editButton, toggleButton, deleteButton ])
 			]));
 		});
 
