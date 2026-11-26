@@ -11,7 +11,7 @@
         "write": {
             "ubus": {
                 "luci.timecontrol": [ "reload" ],
-                "uci": [ "add", "apply", "confirm", "delete", "order", "rename", "set" ]
+                "uci": [ "add", "apply", "commit", "confirm", "delete", "order", "rename", "set" ]
             },
             "uci": [ "timecontrol" ]
         }

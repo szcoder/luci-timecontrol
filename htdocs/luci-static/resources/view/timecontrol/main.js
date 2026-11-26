@@ -19,6 +19,13 @@ var callReload = rpc.declare({
 	method: 'reload'
 });
 
+var callUciCommit = rpc.declare({
+	object: 'uci',
+	method: 'commit',
+	params: [ 'config' ],
+	reject: true
+});
+
 var WEEKDAYS = [
 	[ 'Mon', '周一' ], [ 'Tue', '周二' ], [ 'Wed', '周三' ],
 	[ 'Thu', '周四' ], [ 'Fri', '周五' ], [ 'Sat', '周六' ],
@@ -60,8 +67,11 @@ function vendorOf(mac) {
 }
 
 function commitChanges() {
+	// uci.apply() enables rollback + deferred confirm; reloading the page
+	// immediately would cancel confirm and roll everything back. Use a plain
+	// uci commit instead, then reload the timecontrol service explicitly.
 	return uci.save()
-		.then(function() { return uci.apply(); })
+		.then(function() { return callUciCommit('timecontrol'); })
 		.then(function() { return callReload(); });
 }
 
