@@ -99,6 +99,8 @@ return view.extend({
 			'.timecontrol-btn:hover { background: #0056b3; }',
 			'.timecontrol-add { background: #4CAF50; border-color: #4CAF50; padding: 8px 16px; }',
 			'.timecontrol-delete { background: #f44336; border-color: #f44336; padding: 5px 10px; }',
+			'.timecontrol-disable { background: #ff9800; border-color: #ff9800; padding: 5px 10px; }',
+			'.timecontrol-enable { background: #4CAF50; border-color: #4CAF50; padding: 5px 10px; }',
 			'.weekday-container { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; justify-content: center; }',
 			'.weekday-container label { display: flex; align-items: center; background: #f8f9fa; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; min-width: 60px; justify-content: center; }',
 			'.weekday-container input { margin-right: 6px; }',
@@ -215,6 +217,7 @@ return view.extend({
 			uci.set('timecontrol', ruleId, 'start_time', startTime.value);
 			uci.set('timecontrol', ruleId, 'stop_time', stopTime.value);
 			uci.set('timecontrol', ruleId, 'rule_type', 'allow');
+			uci.set('timecontrol', ruleId, 'enable', '1');
 
 			commitChanges().then(function() {
 				location.reload();
@@ -251,6 +254,21 @@ return view.extend({
 				return found ? found[1] : day;
 			}).join(' ');
 
+			// 旧配置没有 enable 选项时视为启用
+			var ruleEnabled = String(slot.enable || '1') !== '0';
+
+			var toggleButton = E('button', {
+				type: 'button',
+				'class': 'timecontrol-btn ' + (ruleEnabled ? 'timecontrol-disable' : 'timecontrol-enable')
+			}, ruleEnabled ? '禁用' : '启用');
+
+			toggleButton.addEventListener('click', function() {
+				uci.set('timecontrol', slot['.name'], 'enable', ruleEnabled ? '0' : '1');
+				commitChanges().then(function() {
+					location.reload();
+				}).catch(reportError);
+			});
+
 			var deleteButton = E('button', {
 				type: 'button',
 				'class': 'timecontrol-btn timecontrol-delete'
@@ -281,8 +299,8 @@ return view.extend({
 				E('td', {}, String(device.mac || '')),
 				E('td', {}, weekdays),
 				E('td', {}, (slot.start_time || '') + ' - ' + (slot.stop_time || '')),
-				E('td', {}, device.enable === '1' ? '启用' : '禁用'),
-				E('td', {}, deleteButton)
+				E('td', {}, ruleEnabled ? '启用' : '禁用'),
+				E('td', {}, [ toggleButton, deleteButton ])
 			]));
 		});
 

@@ -11,6 +11,7 @@
 - **设备级时间控制**：基于 MAC 地址精确控制特定设备的网络访问
 - **灵活的时间安排**：支持按星期、时间段设置不同的网络访问策略
 - **快速规则配置**：提供"工作日"、"周末"、"全选"等快捷选择
+- **规则独立启停**：每条规则可单独启用/禁用，无需删除即可临时生效或暂停
 - **移动端优化界面**：专为手机操作优化的响应式设计
 
 ### 技术特性
@@ -126,7 +127,8 @@
 
 ### 3. 管理现有规则
 
-- **查看规则**：在下方表格中查看所有活跃的控制规则
+- **查看规则**：在下方表格中查看所有控制规则及其启用状态
+- **启用/禁用规则**：点击规则右侧的"禁用"或"启用"按钮，立即生效且不删除配置
 - **删除规则**：点击"删除"按钮移除不需要的规则
 - **修改规则**：删除现有规则后重新添加
 
@@ -220,6 +222,7 @@ config timeslot 'rule_sony_evening'
     option start_time '19:00'
     option stop_time '21:00'
     option rule_type 'allow'
+    option enable '1'
 
 config timeslot 'rule_sony_weekend'
     option device 'sony_tv'
@@ -227,6 +230,7 @@ config timeslot 'rule_sony_weekend'
     option start_time '14:00'
     option stop_time '18:00'
     option rule_type 'allow'
+    option enable '1'
 ```
 
 ## 🛠️ 开发指南

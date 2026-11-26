@@ -38,6 +38,7 @@ apply_device_rules() {
         local start_time
         local stop_time
         local rule_type
+        local slot_enable
         
         config_get slot_device "$timeslot" device
         
@@ -45,6 +46,10 @@ apply_device_rules() {
         if [ "$slot_device" != "$device_id" ]; then
             return
         fi
+        
+        # 单条规则可独立禁用（未设置时默认启用，兼容旧配置）
+        config_get slot_enable "$timeslot" enable "1"
+        [ "$slot_enable" = "1" ] || return
         
         config_get weekdays "$timeslot" weekdays
         config_get start_time "$timeslot" start_time

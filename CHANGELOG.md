@@ -11,6 +11,9 @@
 - ✨ 菜单入口改为 `view` 类型，ACL 同步授权 ubus 与 UCI 访问
 - 📦 `build.sh` 直接生成 APK v3 包（`*-r1_all.apk`），不再生成 IPK
 
+### 新功能
+- ✨ 每条规则可独立启用/禁用（`timeslot.enable`），无需删除；旧规则默认视为启用
+
 ### 使用方式
 - 安装命令改为 `apk add --allow-untrusted <package>.apk`
 - 卸载命令改为 `apk del luci-app-timecontrol`

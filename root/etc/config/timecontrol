@@ -10,4 +10,5 @@ config timeslot 'rule_sony'
 	option start_time '12:00'
 	option stop_time '13:00'
 	option rule_type 'allow'
+	option enable '1'
 
