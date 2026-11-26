@@ -9,6 +9,5 @@ config timeslot 'rule_sony'
 	option weekdays 'Mon Tue Wed Thu Fri Sat Sun'
 	option start_time '12:00'
 	option stop_time '13:00'
-	option rule_type 'allow'
 	option enable '1'
 

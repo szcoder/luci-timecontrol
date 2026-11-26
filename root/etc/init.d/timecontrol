@@ -28,8 +28,6 @@ apply_device_rules() {
         return
     fi
     
-    local has_rules=0
-    
     # 处理该设备的所有时间规则
     apply_timeslot() {
         local timeslot="$1"
@@ -37,7 +35,6 @@ apply_device_rules() {
         local weekdays
         local start_time
         local stop_time
-        local rule_type
         local slot_enable
         
         config_get slot_device "$timeslot" device
@@ -54,18 +51,9 @@ apply_device_rules() {
         config_get weekdays "$timeslot" weekdays
         config_get start_time "$timeslot" start_time
         config_get stop_time "$timeslot" stop_time
-        config_get rule_type "$timeslot" rule_type "allow"
         
         if [ -z "$start_time" ] || [ -z "$stop_time" ]; then
             return
-        fi
-        
-        has_rules=1
-        
-        # 根据规则类型设置动作
-        local action="accept"
-        if [ "$rule_type" = "deny" ]; then
-            action="drop"
         fi
         
         # 转换星期缩写为完整名称
@@ -82,20 +70,15 @@ apply_device_rules() {
             esac
         }
         
-        # 为每个工作日添加规则
+        # 为列表中的每个星期添加阻断规则；未列出的时间不干预，正常放行
         for day in $weekdays; do
             local full_day=$(convert_weekday "$day")
-            nft add rule inet fw4 $CHAIN_NAME ether saddr "$mac_addr" meta day "$full_day" meta hour "$start_time"-"$stop_time" "$action" comment "\"timecontrol-$device_id-$day\""
+            nft add rule inet fw4 $CHAIN_NAME ether saddr "$mac_addr" meta day "$full_day" meta hour "$start_time"-"$stop_time" drop comment "\"timecontrol-$device_id-$day\""
         done
     }
     
     # 处理所有时间段
     config_foreach apply_timeslot timeslot
-    
-    # 如果有allow规则，添加默认drop规则
-    if [ "$has_rules" = "1" ]; then
-        nft add rule inet fw4 $CHAIN_NAME ether saddr "$mac_addr" drop comment "\"timecontrol-$device_id-default-drop\""
-    fi
 }
 
 # 重新加载所有规则

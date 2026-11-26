@@ -227,7 +227,6 @@ return view.extend({
 			uci.set('timecontrol', ruleId, 'weekdays', weekdays.join(' '));
 			uci.set('timecontrol', ruleId, 'start_time', startTime.value);
 			uci.set('timecontrol', ruleId, 'stop_time', stopTime.value);
-			uci.set('timecontrol', ruleId, 'rule_type', 'allow');
 			uci.set('timecontrol', ruleId, 'enable', '1');
 
 			commitChanges().then(function() {
@@ -236,7 +235,9 @@ return view.extend({
 		});
 
 		var form = E('div', { 'class': 'timecontrol-form' }, [
-			E('h4', {}, '添加新的时间控制规则'),
+			E('h4', {}, '添加新的禁止上网规则'),
+			E('div', { style: 'font-size:12px;color:#666;margin:-5px 0 10px 0' },
+				'列表中的时段将禁止设备上网，其他时间正常放行'),
 			E('div', { 'class': 'timecontrol-row' }, [ E('label', {}, '选择设备:'), select ]),
 			E('div', { 'class': 'timecontrol-row' }, [
 				E('label', {}, '手动输入:'), manualNameInput, manualMacInput
@@ -263,12 +264,6 @@ return view.extend({
 			});
 			var startInput = E('input', { type: 'time', value: slot.start_time || '' });
 			var stopInput = E('input', { type: 'time', value: slot.stop_time || '' });
-			var typeSelect = E('select', {}, [
-				E('option', { value: 'allow' }, '允许'),
-				E('option', { value: 'deny' }, '禁止')
-			]);
-			typeSelect.value = slot.rule_type || 'allow';
-
 			var enableSelect = E('select', {}, [
 				E('option', { value: '1' }, '启用'),
 				E('option', { value: '0' }, '禁用')
@@ -294,7 +289,6 @@ return view.extend({
 				uci.set('timecontrol', slot['.name'], 'weekdays', days);
 				uci.set('timecontrol', slot['.name'], 'start_time', startInput.value);
 				uci.set('timecontrol', slot['.name'], 'stop_time', stopInput.value);
-				uci.set('timecontrol', slot['.name'], 'rule_type', typeSelect.value);
 				uci.set('timecontrol', slot['.name'], 'enable', enableSelect.value);
 
 				commitChanges().then(function() {
@@ -311,7 +305,7 @@ return view.extend({
 				E('td', {}, String(device.mac || '')),
 				E('td', {}, weekdaysInput),
 				E('td', {}, [ startInput, ' - ', stopInput ]),
-				E('td', {}, [ typeSelect, enableSelect ]),
+				E('td', {}, enableSelect),
 				E('td', {}, [ saveButton, cancelButton ])
 			]);
 		}
@@ -389,14 +383,17 @@ return view.extend({
 
 		return E('div', {}, [
 			style,
-			E('h3', {}, '设备时间控制列表'),
+			E('h3', {}, '禁止上网列表（黑名单）'),
+			E('div', {
+				style: 'background:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:10px 12px;border-radius:4px;margin:10px 0;font-size:13px'
+			}, '当前为黑名单模式：下表中列出的设备与时间段将禁止上网，未列出的时间正常放行。'),
 			form,
 			E('table', { 'class': 'timecontrol-table', id: 'rules-table' }, [
 				E('thead', {}, E('tr', {}, [
 					E('th', {}, '设备'),
 					E('th', {}, 'MAC地址'),
 					E('th', {}, '生效日期'),
-					E('th', {}, '允许时间'),
+					E('th', {}, '禁止时间'),
 					E('th', {}, '状态'),
 					E('th', {}, '操作')
 				])),
