@@ -40,13 +40,6 @@ case "$("$APK_BIN" --version 2>&1 | head -n 1)" in
 		;;
 esac
 
-if ! "$APK_BIN" mkpkg --help >/dev/null 2>&1; then
-	echo "错误：当前 apk 不支持 mkpkg 子命令。" >&2
-	echo "OpenWrt 25.12 路由器自带的是 minimal 构建，不含 mkpkg。" >&2
-	echo "请在完整版 apk-tools 3.x 的 Linux 主机上运行，或用 APK=/path/to/full-apk 指定。" >&2
-	exit 1
-fi
-
 FAKEROOT=""
 if [ "$(id -u)" -ne 0 ]; then
 	if command -v fakeroot >/dev/null 2>&1; then
@@ -144,7 +137,7 @@ chmod 755 "$SCRIPTS"/*
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
 export SOURCE_DATE_EPOCH
 
-run_apk mkpkg \
+if ! run_apk mkpkg \
 	--info "name:$PKG_NAME" \
 	--info "version:$APK_VERSION" \
 	--info "description:$DESCRIPTION" \
@@ -160,6 +153,12 @@ run_apk mkpkg \
 	--script "post-deinstall:$SCRIPTS/post-deinstall" \
 	--files "$ROOTFS" \
 	--output "$SCRIPT_DIR/$OUTPUT_NAME"
+then
+	echo "错误：apk mkpkg 执行失败。" >&2
+	echo "如果提示 mkpkg 不是有效命令，说明当前 apk 不含 mkpkg（如 OpenWrt 25.12 路由器的 minimal 构建）。" >&2
+	echo "请在完整版 apk-tools 3.x 的 Linux 主机上运行，或用 APK=/path/to/full-apk 指定。" >&2
+	exit 1
+fi
 
 echo "Package built: $OUTPUT_NAME"
 ls -lh "$SCRIPT_DIR/$OUTPUT_NAME"
