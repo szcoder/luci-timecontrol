@@ -10,7 +10,8 @@
 var callGetDevices = rpc.declare({
 	object: 'luci.timecontrol',
 	method: 'get_devices',
-	expect: { devices: [] }
+	expect: { devices: [] },
+	reject: true
 });
 
 var callReload = rpc.declare({
@@ -78,7 +79,8 @@ return view.extend({
 	},
 
 	render: function(data) {
-		var devices = (data[1] && data[1].devices) || [];
+		// expect: { devices: [] } makes rpc.declare return the array itself
+		var devices = Array.isArray(data[1]) ? data[1] : [];
 		var devicesByName = {};
 		var slots = uci.sections('timecontrol', 'timeslot');
 
@@ -156,6 +158,8 @@ return view.extend({
 		});
 		shortcutRow.children[3].addEventListener('click', function() { selectDays([ 'Sat', 'Sun' ]); });
 
+		var manualNameInput = E('input', { type: 'text', id: 'manual_name', placeholder: '例如：客厅电视' });
+		var manualMacInput = E('input', { type: 'text', id: 'manual_mac', placeholder: 'XX:XX:XX:XX:XX:XX' });
 		var startTime = E('input', { type: 'time', id: 'start_time' });
 		var stopTime = E('input', { type: 'time', id: 'stop_time' });
 		var submitButton = E('button', {
@@ -164,18 +168,37 @@ return view.extend({
 		}, '提交');
 
 		submitButton.addEventListener('click', function() {
-			var match = select.value.match(/^(.*) \(([0-9A-Fa-f:]{17})\)$/);
+			var manualMac = manualMacInput.value.trim();
+			var manualName = manualNameInput.value.trim();
+			var name, mac;
+
+			if (manualMac) {
+				if (!/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(manualMac)) {
+					alert('MAC 地址格式不正确，应为 XX:XX:XX:XX:XX:XX');
+					return;
+				}
+				mac = manualMac.toUpperCase();
+				name = manualName || '手动设备';
+			}
+			else {
+				var match = select.value.match(/^(.*) \(([0-9A-Fa-f:]{17})\)$/);
+				if (!match) {
+					alert('请选择设备，或在下方手动输入设备名称和 MAC 地址');
+					return;
+				}
+				name = match[1];
+				mac = match[2];
+			}
+
 			var weekdays = WEEKDAYS.filter(function(d) {
 				return weekdayBoxes[d[0]].checked;
 			}).map(function(d) { return d[0]; });
 
-			if (!match || weekdays.length === 0 || !startTime.value || !stopTime.value) {
+			if (weekdays.length === 0 || !startTime.value || !stopTime.value) {
 				alert('请填写完整信息');
 				return;
 			}
 
-			var name = match[1];
-			var mac = match[2];
 			var deviceId = 'device_' + mac.toLowerCase().replace(/:/g, '');
 
 			if (!uci.get('timecontrol', deviceId)) {
@@ -201,6 +224,11 @@ return view.extend({
 		var form = E('div', { 'class': 'timecontrol-form' }, [
 			E('h4', {}, '添加新的时间控制规则'),
 			E('div', { 'class': 'timecontrol-row' }, [ E('label', {}, '选择设备:'), select ]),
+			E('div', { 'class': 'timecontrol-row' }, [
+				E('label', {}, '手动输入:'), manualNameInput, manualMacInput
+			]),
+			E('div', { style: 'font-size:12px;color:#666;margin:-5px 0 10px 100px' },
+				'列表为空时可手动填写设备名称和 MAC 地址，填写后优先使用手动输入'),
 			E('div', { 'class': 'timecontrol-row' }, [ E('label', {}, '生效日期:'), shortcutRow ]),
 			weekdayRow,
 			E('div', { 'class': 'timecontrol-row' }, [

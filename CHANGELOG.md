@@ -6,6 +6,8 @@
 - ✨ 支持 OpenWrt 25.12，移除对 `luci-compat` 与 Lua 运行时的依赖
 - ✨ LuCI 界面改为 JavaScript view（`/www/luci-static/resources/view/timecontrol/main.js`）
 - ✨ 新增 rpcd ubus 后端 `luci.timecontrol`，提供设备发现与规则重载接口
+- 🐛 修复设备下拉列表为空：`rpc.declare` 的 `expect` 返回值处理错误
+- ✨ 设备列表为空时可手动输入设备名称与 MAC 地址
 - ✨ 菜单入口改为 `view` 类型，ACL 同步授权 ubus 与 UCI 访问
 - 📦 `build.sh` 直接生成 APK v3 包（`*-r1_all.apk`），不再生成 IPK
 
