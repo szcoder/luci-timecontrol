@@ -12,7 +12,7 @@
 ## 🐳 Docker 环境测试
 
 ### 适用场景
-- 快速验证 IPK 包安装过程
+- 快速验证 APK 包安装过程
 - 测试服务脚本和配置文件
 - 验证 LuCI 界面集成
 - 开发和调试阶段的自动化测试
@@ -25,7 +25,7 @@
 ```
 
 ### 测试内容
-- ✅ IPK 包安装验证
+- ✅ APK 包安装验证
 - ✅ 系统依赖检查
 - ✅ 服务启动和管理
 - ✅ 配置文件生成和解析
@@ -41,7 +41,7 @@
 ### 预期结果
 ```
 =============== 测试结果摘要 ===============
-✅ IPK包安装: 成功
+✅ APK包安装: 成功
 ✅ 服务启动: 成功  
 ✅ 配置生效: 成功
 ✅ 规则创建: 成功
@@ -78,7 +78,7 @@ ROUTER_IP=192.168.4.1 ROUTER_USER=admin ./test-real-router.sh
 
 ### 测试内容
 - ✅ 路由器连接和认证
-- ✅ IPK 包远程安装
+- ✅ APK 包远程安装
 - ✅ 真实设备 MAC 地址检测
 - ✅ 防火墙规则验证
 - ✅ 网络连通性测试
@@ -120,7 +120,7 @@ ROUTER_IP=192.168.4.1 ROUTER_USER=admin ./test-real-router.sh
 |---------|------|---------|
 | 环境准备 | 启动 OpenWrt 容器 | Docker 网络、容器状态 |
 | 依赖安装 | 安装系统依赖包 | nftables, luci-base 等 |
-| IPK 安装 | 安装 timecontrol 包 | 包管理、文件部署 |
+| APK 安装 | 安装 timecontrol 包 | 包管理、文件部署 |
 | 服务测试 | 测试服务管理 | 启动、停止、重载功能 |
 | 配置验证 | 验证 UCI 配置 | 配置文件解析、规则生成 |
 | 规则检查 | 检查防火墙规则 | nftables 规则创建 |
@@ -186,11 +186,11 @@ ping 192.168.1.1
 ssh root@192.168.1.1
 ```
 
-**问题**: IPK 安装失败，提示依赖不满足
+**问题**: APK 安装失败，提示依赖不满足
 ```bash
 # 解决方案：手动安装依赖
-opkg update
-opkg install nftables kmod-nft-core luci-base
+apk update
+apk add nftables kmod-nft-core luci-base rpcd
 ```
 
 **问题**: 防火墙规则未生效

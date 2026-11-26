@@ -1,7 +1,7 @@
 # LuCI Time Control (luci-app-timecontrol)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-1.2.0-green.svg)](https://github.com/openwrt/luci-app-timecontrol/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.0-green.svg)](https://github.com/openwrt/luci-app-timecontrol/releases)
 
 一个专为管理儿童上网时间而设计的 OpenWrt LuCI 应用。通过基于设备 MAC 地址的时间控制，让家长能够轻松管理孩子的网络使用时间，如控制看电视、平板电脑等设备的网络访问时间段。
 
@@ -42,62 +42,60 @@
 ## 📋 系统要求
 
 ### OpenWrt 版本支持
-- ✅ **OpenWrt 23.05** (推荐)
-- ✅ **OpenWrt 24.10** (已测试)
-- ✅ **OpenWrt 22.03** (兼容)
-- ⚠️ **OpenWrt 21.02** (需要手动安装 nftables)
+- ✅ **OpenWrt 25.12** (推荐，原生 APK 包)
+- ⚠️ OpenWrt 24.10 及更早版本请使用本项目的旧版 IPK 包
 
-### ⚠️ 重要兼容性说明
-本应用基于经典LuCI (Lua版本)开发。OpenWrt 23.05及以后版本默认使用新版LuCI (ucode版本)，需要安装`luci-compat`包才能正常运行。安装本应用时会自动安装`luci-compat`依赖。
+### 重要兼容性说明
+本应用已迁移到 LuCI 25.12 的 JavaScript + ucode 架构：界面为纯 JS view，后端通过 rpcd ubus 对象 `luci.timecontrol` 与 UCI 交互。**不再依赖 `luci-compat`，也不需要 Lua 运行时**。软件包格式为 APK v3（apk-tools 3.x），不再提供 IPK。
 
 ### 硬件要求
 - **RAM**: 最小 64MB (推荐 128MB+)
 - **Flash**: 最小 8MB (推荐 16MB+)
-- **架构**: 支持所有 OpenWrt 支持的架构 (x86, ARM, MIPS 等)
+- **架构**: 架构无关包（`noarch`），支持所有 OpenWrt 25.12 设备
 
 ### 依赖包
 - `nftables` - 现代防火墙工具
 - `kmod-nft-core` - nftables 内核模块
 - `luci-base` - LuCI 基础框架
-- `luci-compat` - LuCI兼容层 (OpenWrt 23.05+必需)
+- `rpcd` - 提供 ubus 后端接口
 
 ## 🚀 快速安装
 
 ### 方法一：从发布页面下载 (推荐)
 
-1. **下载 IPK 包**
+1. **下载 APK 包**
    ```bash
-   # 替换为最新版本号和适合你架构的包
-   wget https://github.com/your-repo/luci-app-timecontrol/releases/download/v1.2.0/luci-app-timecontrol_1.2.0_all.ipk
+   # 架构无关包，适用于所有 OpenWrt 25.12 设备
+   wget https://github.com/openwrt/luci-app-timecontrol/releases/download/v1.3.0/luci-app-timecontrol-1.3.0-r1_all.apk
    ```
 
 2. **上传并安装**
    ```bash
-   # 上传到路由器
-   scp luci-app-timecontrol_1.2.0_all.ipk root@192.168.1.1:/tmp/
+   scp luci-app-timecontrol-1.3.0-r1_all.apk root@192.168.1.1:/tmp/
    
-   # SSH 连接路由器并安装
    ssh root@192.168.1.1
-   opkg install /tmp/luci-app-timecontrol_1.2.0_all.ipk
+   apk add --allow-untrusted /tmp/luci-app-timecontrol-1.3.0-r1_all.apk
    ```
 
 ### 方法二：从源码构建
 
 1. **克隆仓库**
    ```bash
-   git clone https://github.com/your-repo/luci-app-timecontrol.git
+   git clone https://github.com/openwrt/luci-app-timecontrol.git
    cd luci-app-timecontrol
    ```
 
-2. **构建 IPK 包**
+2. **构建 APK 包**（构建主机需安装完整版 `apk-tools` 3.x，`build.sh` 会直接输出 `.apk`）
    ```bash
    ./build.sh
    ```
 
+   > 不能直接在 OpenWrt 25.12 路由器上运行：路由器自带的 `apk` 是 minimal 构建，不含 `mkpkg` 子命令。请在 Linux 构建主机上执行。
+
 3. **安装生成的包**
    ```bash
-   scp build/luci-app-timecontrol_1.2.0_all.ipk root@192.168.1.1:/tmp/
-   ssh root@192.168.1.1 'opkg install /tmp/luci-app-timecontrol_1.2.0_all.ipk'
+   scp luci-app-timecontrol-1.3.0-r1_all.apk root@192.168.1.1:/tmp/
+   ssh root@192.168.1.1 'apk add --allow-untrusted /tmp/luci-app-timecontrol-1.3.0-r1_all.apk'
    ```
 
 ## 📱 使用指南
@@ -143,7 +141,7 @@
 ```
 
 **测试内容：**
-- IPK 包安装和文件部署
+- APK 包安装和文件部署
 - 服务启动和管理功能
 - 配置文件解析和 UCI 集成
 - nftables 规则创建和管理
@@ -201,8 +199,10 @@ nft list chain inet fw4 raw_prerouting
 
 - **服务脚本**: `/etc/init.d/timecontrol`
 - **配置文件**: `/etc/config/timecontrol`
-- **LuCI 模板**: `/usr/lib/lua/luci/view/timecontrol/main.htm`
-- **LuCI 控制器**: `/usr/lib/lua/luci/controller/timecontrol.lua`
+- **LuCI 视图**: `/www/luci-static/resources/view/timecontrol/main.js`
+- **菜单配置**: `/usr/share/luci/menu.d/luci-app-timecontrol.json`
+- **ubus 后端**: `/usr/libexec/rpcd/luci.timecontrol`
+- **ACL 配置**: `/usr/share/rpcd/acl.d/luci-app-timecontrol.json`
 
 ### 示例配置文件
 
@@ -235,23 +235,26 @@ config timeslot 'rule_sony_weekend'
 
 ```
 luci-timecontrol/
-├── Makefile                                    # OpenWrt 包构建文件
-├── build.sh                                    # 独立构建脚本
+├── Makefile                                    # OpenWrt 25.12 包构建文件
+├── build.sh                                    # 独立 APK 构建脚本
 ├── README.md                                   # 项目文档
-└── root/                                       # 包文件内容
+├── htdocs/                                     # 由 luci.mk 安装到 /www
+│   └── luci-static/resources/view/timecontrol/
+│       └── main.js                             # LuCI JavaScript 视图
+└── root/                                       # 原样安装到目标根目录
     ├── etc/
     │   ├── config/
     │   │   └── timecontrol                     # UCI 配置文件
     │   └── init.d/
     │       └── timecontrol                     # 系统服务脚本
     └── usr/
-        ├── lib/lua/luci/
-        │   ├── controller/
-        │   │   └── timecontrol.lua             # LuCI 控制器
-        │   └── view/timecontrol/
-        │       └── main.htm                    # 主页面模板
-        └── share/luci/menu.d/
-            └── luci-app-timecontrol.json       # LuCI 菜单配置
+        ├── libexec/rpcd/
+        │   └── luci.timecontrol                # rpcd ubus 后端
+        └── share/
+            ├── luci/menu.d/
+            │   └── luci-app-timecontrol.json   # LuCI 菜单配置
+            └── rpcd/acl.d/
+                └── luci-app-timecontrol.json   # ubus/UCI 权限
 ```
 
 ### 本地开发
@@ -259,7 +262,7 @@ luci-timecontrol/
 1. **修改代码**
    ```bash
    # 编辑相关文件
-   vim root/usr/lib/lua/luci/view/timecontrol/main.htm
+   vim htdocs/luci-static/resources/view/timecontrol/main.js
    vim root/etc/init.d/timecontrol
    ```
 
@@ -271,8 +274,8 @@ luci-timecontrol/
 3. **部署测试**
    ```bash
    # 快速部署到测试路由器
-   scp build/*.ipk root@test-router:/tmp/
-   ssh root@test-router 'opkg remove luci-app-timecontrol; opkg install /tmp/luci-app-timecontrol_*.ipk'
+   scp luci-app-timecontrol-*.apk root@test-router:/tmp/
+   ssh root@test-router 'apk del luci-app-timecontrol; apk add --allow-untrusted /tmp/luci-app-timecontrol-*.apk'
    ```
 
 ### 贡献代码
@@ -340,9 +343,8 @@ logread | grep timecontrol
 本应用已在以下环境中测试验证：
 
 ### 测试通过的版本
-- ✅ **OpenWrt 24.10.1** (x86_64) - 主要测试环境
-- ✅ **OpenWrt 23.05.4** (ARM Cortex-A7) - 在树莓派上测试
-- ✅ **OpenWrt 23.05.2** (MediaTek MT7621) - 路由器测试
+- ✅ **OpenWrt 25.12** (x86_64) - 主要目标版本（APK v3 + LuCI JS view）
+- ⚠️ OpenWrt 24.10 及更早版本请使用 v1.2.0 IPK 包
 
 ### 测试设备类型
 - 📺 智能电视 (Sony, LG, 小米)

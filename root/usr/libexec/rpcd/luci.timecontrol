@@ -1,0 +1,76 @@
+#!/bin/sh
+# rpcd ubus object for luci-app-timecontrol
+# Registered as: luci.timecontrol
+
+. /usr/share/libubox/jshn.sh
+
+list_methods() {
+	echo '{ "get_devices": {}, "reload": {} }'
+}
+
+get_devices() {
+	local leases="$(mktemp)"
+	local sorted="$(mktemp)"
+	local mac ip name
+
+	: > "$leases"
+
+	if [ -f /tmp/dhcp.leases ]; then
+		while read -r expires dhcp_mac dhcp_ip hostname rest; do
+			case "$dhcp_mac" in
+				??:??:??:??:??:??) ;;
+				*) continue ;;
+			esac
+			[ "$dhcp_mac" = "00:00:00:00:00:00" ] && continue
+			[ "$hostname" = "*" ] && hostname=""
+			printf '%s|%s|%s\n' "$dhcp_mac" "$dhcp_ip" "$hostname" >> "$leases"
+		done < /tmp/dhcp.leases
+	fi
+
+	if [ -f /proc/net/arp ]; then
+		awk 'NR > 1 { mac = $4; if (mac != "" && mac != "00:00:00:00:00:00") printf "%s|%s|\n", mac, $1 }' \
+			/proc/net/arp >> "$leases"
+	fi
+
+	awk -F'|' '!seen[$1]++' "$leases" | sort -t'|' -k3,3 > "$sorted"
+
+	json_init
+	json_add_array devices
+
+	while IFS='|' read -r mac ip name; do
+		[ -n "$mac" ] || continue
+		json_add_object
+		json_add_string mac "$mac"
+		json_add_string ip "$ip"
+		json_add_string name "$name"
+		json_close_object
+	done < "$sorted"
+
+	json_close_array
+	json_dump
+
+	rm -f "$leases" "$sorted"
+}
+
+reload_service() {
+	/etc/init.d/timecontrol reload >/dev/null 2>&1
+	json_init
+	json_add_boolean success 1
+	json_dump
+}
+
+case "$1" in
+	list)
+		list_methods
+		;;
+	call)
+		case "$2" in
+			get_devices)
+				get_devices
+				;;
+			reload)
+				reload_service
+				;;
+		esac
+		;;
+esac

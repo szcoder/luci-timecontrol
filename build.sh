@@ -1,128 +1,166 @@
-#!/bin/bash
+#!/bin/sh
 
 # LuCI Time Control 打包脚本
+# 目标平台：OpenWrt 25.12+
+# 注意：需在完整版 apk-tools 3.x 上运行；OpenWrt 25.12 路由器自带的是
+#       minimal 构建，不含 mkpkg，不能直接在路由器上执行本脚本
+# 产物：APK v3 包（apk-tools >= 3 的 `apk mkpkg` 格式）
+
+set -eu
 
 PKG_NAME="luci-app-timecontrol"
 VERSION="1.3.0"
-ARCH="all"
+PKG_RELEASE="1"
+APK_VERSION="${VERSION}-r${PKG_RELEASE}"
+ARCH="noarch"
+OUTPUT_NAME="${PKG_NAME}-${APK_VERSION}_all.apk"
 
-# 获取脚本所在目录
+MAINTAINER="OpenWrt Community"
+DESCRIPTION="LuCI support for time-based network access control (parental control)"
+DEPENDS="libc nftables kmod-nft-core luci-base rpcd"
+URL="https://github.com/openwrt/luci-app-timecontrol"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APK_BIN="${APK:-apk}"
 
-echo "Building $PKG_NAME version $VERSION..."
+echo "Building $PKG_NAME $APK_VERSION ($ARCH) as APK..."
 
-# 创建临时目录
-TEMP_DIR=$(mktemp -d)
-PKG_DIR="$TEMP_DIR/$PKG_NAME"
-mkdir -p "$PKG_DIR"
+# ---- 环境检查 ---------------------------------------------------------------
+if ! command -v "$APK_BIN" >/dev/null 2>&1; then
+	echo "错误：未找到 apk-tools 3.x（可通过 APK=/path/to/apk 指定）。" >&2
+	echo "OpenWrt 25.12 的 APK v3 包需要 apk mkpkg 生成，请先安装 apk-tools >= 3。" >&2
+	exit 1
+fi
 
-# 创建CONTROL目录
-mkdir -p "$PKG_DIR/CONTROL"
+case "$("$APK_BIN" --version 2>&1 | head -n 1)" in
+	"apk-tools 3."*) ;;
+	*)
+		echo "错误：$APK_BIN 不是 apk-tools 3.x，无法生成 APK v3 包。" >&2
+		exit 1
+		;;
+esac
 
-# 创建control文件
-cat > "$PKG_DIR/CONTROL/control" << EOC
-Package: $PKG_NAME
-Version: $VERSION
-Depends: libc, nftables, luci-compat
-Architecture: $ARCH
-Section: luci
-Priority: optional
-Description: LuCI support for Time-based network access control
- Allows you to control network access for devices based on time schedules.
- Features MAC vendor detection and multiple time rules per device.
-EOC
+if ! "$APK_BIN" mkpkg --help >/dev/null 2>&1; then
+	echo "错误：当前 apk 不支持 mkpkg 子命令。" >&2
+	echo "OpenWrt 25.12 路由器自带的是 minimal 构建，不含 mkpkg。" >&2
+	echo "请在完整版 apk-tools 3.x 的 Linux 主机上运行，或用 APK=/path/to/full-apk 指定。" >&2
+	exit 1
+fi
 
-# 创建postinst脚本
-cat > "$PKG_DIR/CONTROL/postinst" << 'EOP'
-#!/bin/sh
-# 启用服务开机自启动
-/etc/init.d/timecontrol enable 2>/dev/null
+FAKEROOT=""
+if [ "$(id -u)" -ne 0 ]; then
+	if command -v fakeroot >/dev/null 2>&1; then
+		FAKEROOT="1"
+	else
+		echo "警告：非 root 构建，包内文件属主可能与目标设备不一致。" >&2
+	fi
+fi
 
-# 创建默认配置文件（如果不存在）
-[ ! -f /etc/config/timecontrol ] && touch /etc/config/timecontrol
-
-# 启动服务
-/etc/init.d/timecontrol start 2>/dev/null
-
-# 清理LuCI缓存
-rm -rf /tmp/luci-* 2>/dev/null
-
-exit 0
-EOP
-chmod 755 "$PKG_DIR/CONTROL/postinst"
-
-# 创建prerm脚本
-cat > "$PKG_DIR/CONTROL/prerm" << 'EOR'
-#!/bin/sh
-# 停止服务
-/etc/init.d/timecontrol stop 2>/dev/null
-
-# 禁用开机自启动  
-/etc/init.d/timecontrol disable 2>/dev/null
-
-exit 0
-EOR
-chmod 755 "$PKG_DIR/CONTROL/prerm"
-
-# 复制文件到包目录
-echo "Copying files..."
-
-# init.d脚本
-mkdir -p "$PKG_DIR/etc/init.d"
-cp root/etc/init.d/timecontrol "$PKG_DIR/etc/init.d/"
-chmod 755 "$PKG_DIR/etc/init.d/timecontrol"
-
-# 默认配置
-mkdir -p "$PKG_DIR/etc/config"
-touch "$PKG_DIR/etc/config/timecontrol"
-
-# LuCI控制器
-mkdir -p "$PKG_DIR/usr/lib/lua/luci/controller"
-cp root/usr/lib/lua/luci/controller/timecontrol.lua "$PKG_DIR/usr/lib/lua/luci/controller/"
-
-# LuCI视图
-mkdir -p "$PKG_DIR/usr/lib/lua/luci/view/timecontrol"
-cp root/usr/lib/lua/luci/view/timecontrol/main.htm "$PKG_DIR/usr/lib/lua/luci/view/timecontrol/"
-
-# ACL权限
-mkdir -p "$PKG_DIR/usr/share/rpcd/acl.d"
-cat > "$PKG_DIR/usr/share/rpcd/acl.d/luci-app-timecontrol.json" << 'EOA'
-{
-    "luci-app-timecontrol": {
-        "description": "Grant access to Time Control",
-        "read": {
-            "uci": [ "timecontrol" ]
-        },
-        "write": {
-            "uci": [ "timecontrol" ]
-        }
-    }
+run_apk() {
+	if [ -n "$FAKEROOT" ]; then
+		fakeroot -- "$APK_BIN" "$@"
+	else
+		"$APK_BIN" "$@"
+	fi
 }
-EOA
 
-# 菜单配置（LuCI2）
-mkdir -p "$PKG_DIR/usr/share/luci/menu.d"
-cp root/usr/share/luci/menu.d/luci-app-timecontrol.json "$PKG_DIR/usr/share/luci/menu.d/" 2>/dev/null || true
+sha256_of() {
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum "$1" | awk '{print $1}'
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 "$1" | awk '{print $1}'
+	else
+		echo "0000000000000000000000000000000000000000000000000000000000000000"
+	fi
+}
 
-# 构建IPK包
-echo "Building IPK package..."
-cd "$TEMP_DIR"
+# ---- 准备暂存目录 -----------------------------------------------------------
+TEMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
-# 使用GNU tar确保兼容性
-tar -czf "$PKG_NAME/data.tar.gz" -C "$PKG_NAME" --exclude=CONTROL --numeric-owner .
-tar -czf "$PKG_NAME/control.tar.gz" -C "$PKG_NAME/CONTROL" --numeric-owner .
-echo "2.0" > "$PKG_NAME/debian-binary"
+ROOTFS="$TEMP_DIR/files"
+SCRIPTS="$TEMP_DIR/scripts"
+mkdir -p "$ROOTFS" "$SCRIPTS"
 
-# 创建IPK
-cd "$TEMP_DIR"
-ar -r "$PKG_NAME-${VERSION}_${ARCH}.ipk" "$PKG_NAME/debian-binary" "$PKG_NAME/control.tar.gz" "$PKG_NAME/data.tar.gz" 2>/dev/null
+# root/ 原样映射到目标根目录；htdocs/ 映射到 /www
+cp -r "$SCRIPT_DIR/root/." "$ROOTFS/"
+mkdir -p "$ROOTFS/www/luci-static"
+cp -r "$SCRIPT_DIR/htdocs/luci-static/." "$ROOTFS/www/luci-static/"
 
-# 移动到脚本目录
-mv "$PKG_NAME-${VERSION}_${ARCH}.ipk" "$SCRIPT_DIR/"
+find "$ROOTFS" -type d -exec chmod 755 {} \;
+find "$ROOTFS" -type f -exec chmod 644 {} \;
+chmod 755 "$ROOTFS/etc/init.d/timecontrol" \
+	"$ROOTFS/usr/libexec/rpcd/luci.timecontrol"
+chmod 600 "$ROOTFS/etc/config/timecontrol"
 
-# 清理
-cd "$SCRIPT_DIR"
-rm -rf "$TEMP_DIR"
+# ---- OpenWrt APK 包元数据 ---------------------------------------------------
+META_DIR="$ROOTFS/lib/apk/packages"
+mkdir -p "$META_DIR"
 
-echo "Package built: $PKG_NAME-${VERSION}_${ARCH}.ipk"
-ls -lh "$PKG_NAME-${VERSION}_${ARCH}.ipk"
+# 先生成文件清单，避免把元数据文件自身写入清单
+(cd "$ROOTFS" && find . \( -type f -o -type l \) | sed 's|^\./|/|' | LC_ALL=C sort) \
+	> "$META_DIR/$PKG_NAME.list"
+
+: > "$META_DIR/$PKG_NAME.conffiles"
+: > "$META_DIR/$PKG_NAME.conffiles_static"
+echo "/etc/config/timecontrol" >> "$META_DIR/$PKG_NAME.conffiles"
+printf '/etc/config/timecontrol %s\n' "$(sha256_of "$ROOTFS/etc/config/timecontrol")" \
+	>> "$META_DIR/$PKG_NAME.conffiles_static"
+chmod 644 "$META_DIR"/*
+
+# ---- 维护脚本（apk 命名与 ipk 不同） ----------------------------------------
+cat > "$SCRIPTS/post-install" <<'EOF'
+#!/bin/sh
+INSTROOT="${IPKG_INSTROOT:-/}"
+chmod 755 "${INSTROOT}/etc/init.d/timecontrol" \
+	"${INSTROOT}/usr/libexec/rpcd/luci.timecontrol" 2>/dev/null
+[ -n "${IPKG_INSTROOT}" ] && exit 0
+/etc/init.d/timecontrol enable 2>/dev/null
+/etc/init.d/timecontrol start 2>/dev/null
+/etc/init.d/rpcd reload 2>/dev/null
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache 2>/dev/null
+exit 0
+EOF
+cp "$SCRIPTS/post-install" "$SCRIPTS/post-upgrade"
+
+cat > "$SCRIPTS/pre-deinstall" <<'EOF'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] && exit 0
+/etc/init.d/timecontrol stop 2>/dev/null
+/etc/init.d/timecontrol disable 2>/dev/null
+exit 0
+EOF
+
+cat > "$SCRIPTS/post-deinstall" <<'EOF'
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] && exit 0
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache 2>/dev/null
+exit 0
+EOF
+
+chmod 755 "$SCRIPTS"/*
+
+# ---- 生成 APK ---------------------------------------------------------------
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
+export SOURCE_DATE_EPOCH
+
+run_apk mkpkg \
+	--info "name:$PKG_NAME" \
+	--info "version:$APK_VERSION" \
+	--info "description:$DESCRIPTION" \
+	--info "arch:$ARCH" \
+	--info "license:MIT" \
+	--info "origin:$PKG_NAME" \
+	--info "url:$URL" \
+	--info "maintainer:$MAINTAINER" \
+	--info "depends:$DEPENDS" \
+	--script "post-install:$SCRIPTS/post-install" \
+	--script "post-upgrade:$SCRIPTS/post-upgrade" \
+	--script "pre-deinstall:$SCRIPTS/pre-deinstall" \
+	--script "post-deinstall:$SCRIPTS/post-deinstall" \
+	--files "$ROOTFS" \
+	--output "$SCRIPT_DIR/$OUTPUT_NAME"
+
+echo "Package built: $OUTPUT_NAME"
+ls -lh "$SCRIPT_DIR/$OUTPUT_NAME"
+echo "Install on OpenWrt 25.12+: apk add --allow-untrusted $OUTPUT_NAME"

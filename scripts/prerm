@@ -1,11 +1,9 @@
 #!/bin/sh
 
-# 卸载前脚本 - 清理服务
+# 卸载前脚本 - 清理服务（离线镜像构建时跳过）
+[ -n "${IPKG_INSTROOT}" ] && exit 0
 
-# 停止服务
-/etc/init.d/timecontrol stop
-
-# 禁用开机自启动
-/etc/init.d/timecontrol disable
+/etc/init.d/timecontrol stop 2>/dev/null
+/etc/init.d/timecontrol disable 2>/dev/null
 
 exit 0

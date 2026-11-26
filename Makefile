@@ -1,48 +1,37 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-timecontrol
-PKG_VERSION:=1.2.0
+PKG_VERSION:=1.3.0
 PKG_RELEASE:=1
 
-PKG_LICENSE:=GPL-3.0
+PKG_LICENSE:=MIT
 PKG_MAINTAINER:=OpenWrt Community
 
 LUCI_TITLE:=LuCI support for Time Control
 LUCI_DESCRIPTION:=Time-based network access control for devices (ideal for parental control)
-LUCI_DEPENDS:=+nftables +kmod-nft-core +luci-base +luci-compat
+# OpenWrt 25.12 uses LuCI with ucode/JavaScript; luci-compat and Lua are not needed
+LUCI_DEPENDS:=+nftables +kmod-nft-core +luci-base +rpcd
 LUCI_PKGARCH:=all
 
 PKG_BUILD_PARALLEL:=1
 
-include $(TOPDIR)/feeds/luci/luci.mk
-
-define Package/$(PKG_NAME)/install
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./root/etc/init.d/timecontrol $(1)/etc/init.d/timecontrol
-	
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./root/etc/config/timecontrol $(1)/etc/config/timecontrol
-	
-	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/controller
-	$(INSTALL_DATA) ./root/usr/lib/lua/luci/controller/timecontrol.lua $(1)/usr/lib/lua/luci/controller/timecontrol.lua
-	
-	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/view/timecontrol
-	$(INSTALL_DATA) ./root/usr/lib/lua/luci/view/timecontrol/main.htm $(1)/usr/lib/lua/luci/view/timecontrol/main.htm
-	
-	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
-	$(INSTALL_DATA) ./root/usr/share/luci/menu.d/luci-app-timecontrol.json $(1)/usr/share/luci/menu.d/luci-app-timecontrol.json
-endef
-
+# Define maintainer scripts before luci.mk evaluates BuildPackage
 define Package/$(PKG_NAME)/postinst
 #!/bin/sh
+INSTROOT="$${IPKG_INSTROOT:-/}"
+chmod 755 "$${INSTROOT}/etc/init.d/timecontrol" \
+	"$${INSTROOT}/usr/libexec/rpcd/luci.timecontrol" 2>/dev/null
 [ -n "$${IPKG_INSTROOT}" ] || {
 	# Enable and start timecontrol service on first install
 	/etc/init.d/timecontrol enable
 	/etc/init.d/timecontrol start
-	
+
+	# Make rpcd pick up the new ubus object
+	/etc/init.d/rpcd reload 2>/dev/null
+
 	# Clear LuCI cache
 	rm -rf /tmp/luci-indexcache /tmp/luci-modulecache
-	
+
 	# Restart LuCI if running
 	/etc/init.d/uhttpd restart 2>/dev/null
 }
@@ -59,4 +48,6 @@ define Package/$(PKG_NAME)/prerm
 exit 0
 endef
 
-# call BuildPackage - OpenWrt buildroot signature
+include $(TOPDIR)/feeds/luci/luci.mk
+
+# luci.mk installs root/ (etc + rpcd) and htdocs/ (JavaScript view) automatically

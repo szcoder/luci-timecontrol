@@ -2,9 +2,15 @@
     "luci-app-timecontrol": {
         "description": "Grant access to Time Control",
         "read": {
+            "ubus": {
+                "luci.timecontrol": [ "get_devices" ]
+            },
             "uci": [ "timecontrol" ]
         },
         "write": {
+            "ubus": {
+                "luci.timecontrol": [ "reload" ]
+            },
             "uci": [ "timecontrol" ]
         }
     }

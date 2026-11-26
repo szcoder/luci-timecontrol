@@ -1,5 +1,6 @@
 # Build outputs
 build/luci-app-timecontrol_*
+luci-app-timecontrol-*.apk
 
 # macOS
 .DS_Store
@@ -18,7 +19,9 @@ build/luci-app-timecontrol_*
 .idea/
 
 # Logs
-*.log*.ipk
+*.log
+*.ipk
+*.apk
 *.tar.gz
 test/
 build/

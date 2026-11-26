@@ -1,5 +1,20 @@
 # 更新日志
 
+## v1.3.0 (2026-11-26)
+
+### 平台迁移
+- ✨ 支持 OpenWrt 25.12，移除对 `luci-compat` 与 Lua 运行时的依赖
+- ✨ LuCI 界面改为 JavaScript view（`/www/luci-static/resources/view/timecontrol/main.js`）
+- ✨ 新增 rpcd ubus 后端 `luci.timecontrol`，提供设备发现与规则重载接口
+- ✨ 菜单入口改为 `view` 类型，ACL 同步授权 ubus 与 UCI 访问
+- 📦 `build.sh` 直接生成 APK v3 包（`*-r1_all.apk`），不再生成 IPK
+
+### 使用方式
+- 安装命令改为 `apk add --allow-untrusted <package>.apk`
+- 卸载命令改为 `apk del luci-app-timecontrol`
+
+---
+
 ## v1.2.0 (2025-08-28)
 
 ### 新功能

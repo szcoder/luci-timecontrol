@@ -3,7 +3,7 @@
         "title": "Time Control",
         "order": 60,
         "action": {
-            "type": "template",
+            "type": "view",
             "path": "timecontrol/main"
         },
         "depends": {

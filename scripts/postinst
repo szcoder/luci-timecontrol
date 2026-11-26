@@ -1,19 +1,18 @@
 #!/bin/sh
 
-# 安装后脚本 - 自动启用服务
+# 安装后脚本 - 自动启用服务（离线镜像构建时跳过服务启动）
+INSTROOT="${IPKG_INSTROOT:-/}"
+chmod 755 "${INSTROOT}/etc/init.d/timecontrol" \
+	"${INSTROOT}/usr/libexec/rpcd/luci.timecontrol" 2>/dev/null
+[ -n "${IPKG_INSTROOT}" ] && exit 0
 
-# 启用服务开机自启动
-/etc/init.d/timecontrol enable
+/etc/init.d/timecontrol enable 2>/dev/null
+/etc/init.d/timecontrol start 2>/dev/null
 
-# 创建默认配置文件（如果不存在）
-if [ ! -f /etc/config/timecontrol ]; then
-    touch /etc/config/timecontrol
-fi
+# 让 rpcd 重新加载 ubus 对象
+/etc/init.d/rpcd reload 2>/dev/null
 
-# 启动服务
-/etc/init.d/timecontrol start
-
-# 清理LuCI缓存
-rm -rf /tmp/luci-*
+# 清理 LuCI 缓存
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache 2>/dev/null
 
 exit 0
