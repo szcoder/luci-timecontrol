@@ -9,6 +9,8 @@
 - 🐛 修复设备下拉列表为空：`rpc.declare` 的 `expect` 返回值处理错误
 - 🐛 修复规则启用/禁用时报 `ubus code 6`：补齐 `uci` ubus 方法 ACL
 - 🐛 修复提交规则后刷新页面导致配置被回滚：改用 `uci commit` 替代带回滚的 `uci.apply()`
+- 🐛 修复重启后 nft 规则丢失：`USE_PROCD=0` 时补齐 `start`/`stop`/`reload` 入口
+- 🐛 规则改为 fw4 自动 include 文件（`/usr/share/nftables.d/chain-post/raw_prerouting/90-timecontrol.nft`），重启或防火墙重载后自动恢复
 - ✨ 设备列表为空时可手动输入设备名称与 MAC 地址
 - ✨ 菜单入口改为 `view` 类型，ACL 同步授权 ubus 与 UCI 访问
 - 📦 `build.sh` 直接生成 APK v3 包（`*-r1_all.apk`），不再生成 IPK

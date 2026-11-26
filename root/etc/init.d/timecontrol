@@ -1,6 +1,6 @@
 #!/bin/sh /etc/rc.common
 
-# 时间访问控制服务
+# 时间访问控制服务（黑名单：列表中的时段禁止上网）
 
 START=95
 STOP=10
@@ -8,92 +8,77 @@ STOP=10
 USE_PROCD=0
 
 CHAIN_NAME="raw_prerouting"
+INCLUDE_DIR="/usr/share/nftables.d/chain-post/$CHAIN_NAME"
+INCLUDE_FILE="$INCLUDE_DIR/90-timecontrol.nft"
 
-# 清理现有的timecontrol防火墙规则
-clean_timecontrol_rules() {
-    nft flush chain inet fw4 $CHAIN_NAME 2>/dev/null || true
+convert_weekday() {
+    case "$1" in
+        Mon) echo "Monday" ;;
+        Tue) echo "Tuesday" ;;
+        Wed) echo "Wednesday" ;;
+        Thu) echo "Thursday" ;;
+        Fri) echo "Friday" ;;
+        Sat) echo "Saturday" ;;
+        Sun) echo "Sunday" ;;
+        *) echo "$1" ;;
+    esac
 }
 
-# 应用单个设备的所有规则
-apply_device_rules() {
-    local device_id="$1"
-    local mac_addr
-    local enable
-    
-    # 获取设备信息
-    config_get mac_addr "$device_id" mac
-    config_get enable "$device_id" enable "1"
-    
-    if [ -z "$mac_addr" ] || [ "$enable" != "1" ]; then
-        return
-    fi
-    
-    # 处理该设备的所有时间规则
-    apply_timeslot() {
-        local timeslot="$1"
-        local slot_device
-        local weekdays
-        local start_time
-        local stop_time
-        local slot_enable
-        
-        config_get slot_device "$timeslot" device
-        
-        # 只处理属于当前设备的规则
-        if [ "$slot_device" != "$device_id" ]; then
-            return
-        fi
-        
-        # 单条规则可独立禁用（未设置时默认启用，兼容旧配置）
-        config_get slot_enable "$timeslot" enable "1"
-        [ "$slot_enable" = "1" ] || return
-        
-        config_get weekdays "$timeslot" weekdays
-        config_get start_time "$timeslot" start_time
-        config_get stop_time "$timeslot" stop_time
-        
-        if [ -z "$start_time" ] || [ -z "$stop_time" ]; then
-            return
-        fi
-        
-        # 转换星期缩写为完整名称
-        convert_weekday() {
-            case "$1" in
-                Mon) echo "Monday" ;;
-                Tue) echo "Tuesday" ;;
-                Wed) echo "Wednesday" ;;
-                Thu) echo "Thursday" ;;
-                Fri) echo "Friday" ;;
-                Sat) echo "Saturday" ;;
-                Sun) echo "Sunday" ;;
-                *) echo "$1" ;;
-            esac
-        }
-        
-        # 为列表中的每个星期添加阻断规则；未列出的时间不干预，正常放行
-        for day in $weekdays; do
-            local full_day=$(convert_weekday "$day")
-            nft add rule inet fw4 $CHAIN_NAME ether saddr "$mac_addr" meta day "$full_day" meta hour "$start_time"-"$stop_time" drop comment "\"timecontrol-$device_id-$day\""
-        done
-    }
-    
-    # 处理所有时间段
-    config_foreach apply_timeslot timeslot
+# 把一条 timeslot 转换成 fw4 include 片段
+append_timeslot_rules() {
+    local timeslot="$1"
+    local slot_device slot_enable device_enable mac_addr
+    local weekdays start_time stop_time day full_day
+
+    config_get slot_device "$timeslot" device
+    [ -n "$slot_device" ] || return
+
+    config_get device_enable "$slot_device" enable "1"
+    [ "$device_enable" = "1" ] || return
+
+    # 单条规则可独立禁用（未设置时默认启用，兼容旧配置）
+    config_get slot_enable "$timeslot" enable "1"
+    [ "$slot_enable" = "1" ] || return
+
+    config_get mac_addr "$slot_device" mac
+    [ -n "$mac_addr" ] || return
+
+    config_get weekdays "$timeslot" weekdays
+    config_get start_time "$timeslot" start_time
+    config_get stop_time "$timeslot" stop_time
+    [ -n "$weekdays" ] && [ -n "$start_time" ] && [ -n "$stop_time" ] || return
+
+    for day in $weekdays; do
+        full_day=$(convert_weekday "$day")
+        [ -n "$full_day" ] || continue
+        printf '\tether saddr %s meta day "%s" meta hour "%s"-"%s" drop comment "timecontrol-%s-%s"\n' \
+            "$mac_addr" "$full_day" "$start_time" "$stop_time" "$slot_device" "$day" >> "$INCLUDE_FILE"
+    done
 }
 
-# 重新加载所有规则
-reload_rules() {
-    # 先清理现有规则
-    clean_timecontrol_rules
-    
-    # 确保raw_prerouting链存在
-    nft add chain inet fw4 $CHAIN_NAME { type filter hook prerouting priority raw\; } 2>/dev/null || true
-    
-    # 加载配置
+generate_include_file() {
+    mkdir -p "$INCLUDE_DIR"
+    : > "$INCLUDE_FILE"
+
     config_load timecontrol
-    
-    # 为每个设备应用规则
-    config_foreach apply_device_rules device
+    config_foreach append_timeslot_rules timeslot
+}
+
+reload_firewall() {
+    if command -v fw4 >/dev/null 2>&1; then
+        fw4 check >/dev/null 2>&1 || {
+            echo "timecontrol: invalid nft include, firewall not reloaded" >&2
+            return 1
+        }
+        fw4 reload >/dev/null 2>&1
+    else
+        /etc/init.d/firewall reload >/dev/null 2>&1
+    fi
+}
+
+reload_rules() {
+    generate_include_file
+    reload_firewall
 }
 
 start_service() {
@@ -102,7 +87,8 @@ start_service() {
 }
 
 stop_service() {
-    clean_timecontrol_rules
+    rm -f "$INCLUDE_FILE"
+    reload_firewall
     echo "timecontrol service stopped"
 }
 
@@ -111,7 +97,15 @@ reload_service() {
     echo "timecontrol rules reloaded"
 }
 
-boot() {
-    # 启动时延迟执行，确保网络和防火墙已初始化
-    ( sleep 10; start_service ) &
+# USE_PROCD=0 时 rc.common 不会自动映射这些函数，必须显式定义
+start() {
+    start_service
+}
+
+stop() {
+    stop_service
+}
+
+reload() {
+    reload_service
 }
